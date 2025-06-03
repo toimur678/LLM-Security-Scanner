@@ -1,7 +1,5 @@
 # Testing google api key if it's works for not.
 
-
-
 import os
 from langchain_community.chat_models import ChatGooglePalm
 from langchain_core.messages import HumanMessage
