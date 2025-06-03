@@ -22,7 +22,7 @@ def check_backend_compatibility(provider):
         "openai": ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"],
         "anthropic": ["claude-3-sonnet", "claude-3-haiku", "claude-2"],
         "cohere": ["command", "command-light"],
-        "google_palm": ["palm-2"]
+        "google_palm": ["models/chat-bison-001", "models/text-bison-001"] # Updated
     }
     return supported_backends.get(provider, [])
 
@@ -93,9 +93,8 @@ valid_providers = ["anthropic", "cohere", "google_palm", "openai"]
 
 with col1:
     st.subheader("🎯 Target LLM")
-    target_provider = st.selectbox("Target Provider", valid_providers, index=0)  # Anthropic'i varsayılan yap
+    target_provider = st.selectbox("Target Provider", valid_providers, index=0)
     
-    # Provider'a göre model önerileri
     if target_provider == "openai":
         default_target_model = "gpt-3.5-turbo"
         st.info("⚠️ OpenAI backend issues reported. Consider using Anthropic.")
@@ -104,9 +103,12 @@ with col1:
         st.success("✅ Anthropic backend stable.")
     elif target_provider == "cohere":
         default_target_model = "command"
-    else:
-        default_target_model = "palm-2"
-    
+    # Update this section for google_palm
+    elif target_provider == "google_palm": # Or your 'else' block if it covers google_palm
+        default_target_model = "models/chat-bison-001" # Changed from "palm-2"
+    else: # Default or if other providers are added, ensure google_palm uses a valid model
+        default_target_model = "models/chat-bison-001" # Or handle appropriately
+
     target_model = st.text_input("Target Model", default_target_model)
 
     st.subheader("📝 System Prompt")
@@ -129,7 +131,7 @@ with col1:
 
 with col2:
     st.subheader("⚔️ Attack LLM")
-    attack_provider = st.selectbox("Attack Provider", valid_providers, index=0)  # Anthropic varsayılan
+    attack_provider = st.selectbox("Attack Provider", valid_providers, index=0)
     
     if attack_provider == "openai":
         default_attack_model = "gpt-3.5-turbo"
@@ -138,11 +140,16 @@ with col2:
         default_attack_model = "claude-3-sonnet-20240229"
     elif attack_provider == "cohere":
         default_attack_model = "command"
-    else:
-        default_attack_model = "palm-2"
+    # Update this section for google_palm
+    elif attack_provider == "google_palm": # Or your 'else' block if it covers google_palm
+        default_attack_model = "models/chat-bison-001" # Changed from "palm-2"
+    else: # Default or if other providers are added
+        default_attack_model = "models/chat-bison-001" # Or handle appropriately
         
     attack_model = st.text_input("Attack Model", default_attack_model)
-    attack_temperature = st.slider("Attack Temperature", 0.0, 2.0, 0.7, 0.05)
+
+    # Slider bug fixed. (03.06.2025)
+    attack_temperature = st.slider("Attack Temperature", 0.0, 1.0, 0.7, 0.05)
 
     st.subheader("🧪 Test Parameters")
     num_attempts = st.number_input("Number of attack prompts", min_value=1, value=3)
