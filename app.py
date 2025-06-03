@@ -27,7 +27,7 @@ def check_backend_compatibility(provider):
     return supported_backends.get(provider, [])
 
 # Hata yakalama ve alternatif çözüm
-def run_security_scan_with_fallback(command):
+def run_security_scan_with_fallback(command, env_vars): # Added env_vars argument
     """PS-FUZZ çalıştır, hata durumunda alternatif çözüm sun"""
     try:
         # Ana PS-FUZZ komutu
@@ -41,7 +41,8 @@ def run_security_scan_with_fallback(command):
             bufsize=1,
             universal_newlines=True,
             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-            shell=False
+            shell=False,
+            env=env_vars # Pass the custom environment
         )
         
         return process
@@ -49,22 +50,6 @@ def run_security_scan_with_fallback(command):
     except Exception as e:
         st.error(f"PS-FUZZ execution failed: {str(e)}")
         return None
-
-# Backend konfigürasyonu düzeltme
-def fix_backend_config(target_provider, attack_provider):
-    """Backend konfigürasyonunu düzelt"""
-    
-    # OpenAI için özel düzeltme
-    if target_provider == "openai" or attack_provider == "openai":
-        if not os.getenv("OPENAI_API_KEY"):
-            st.error("OpenAI API key eksik!")
-            return False
-            
-        # OpenAI backend sorununu düzelt
-        os.environ["OPENAI_API_TYPE"] = "openai"
-        os.environ["OPENAI_API_VERSION"] = "2023-12-01-preview"
-    
-    return True
 
 # Ana arayüz kodunuz...
 st.sidebar.header("🔑 API Key Configuration")
@@ -88,14 +73,14 @@ st.sidebar.warning("Some backends may have compatibility issues. Try different p
 st.header("🚀 Fuzzer Configuration")
 col1, col2 = st.columns(2)
 
-# Desteklenen provider'lar - OpenAI sorunu için güncellendi
-valid_providers = ["anthropic", "cohere", "google_palm", "openai"]
+# Desteklenen provider'lar - DÜZELTİLDİ
+valid_providers = ["anthropic", "cohere", "google_palm", "open_ai"]  # Changed "openai" to "open_ai"
 
 with col1:
     st.subheader("🎯 Target LLM")
     target_provider = st.selectbox("Target Provider", valid_providers, index=0)
     
-    if target_provider == "openai":
+    if target_provider == "open_ai":  # Changed to "open_ai"
         default_target_model = "gpt-3.5-turbo"
         st.info("⚠️ OpenAI backend issues reported. Consider using Anthropic.")
     elif target_provider == "anthropic":
@@ -103,11 +88,10 @@ with col1:
         st.success("✅ Anthropic backend stable.")
     elif target_provider == "cohere":
         default_target_model = "command"
-    # Update this section for google_palm
-    elif target_provider == "google_palm": # Or your 'else' block if it covers google_palm
-        default_target_model = "models/chat-bison-001" # Changed from "palm-2"
-    else: # Default or if other providers are added, ensure google_palm uses a valid model
-        default_target_model = "models/chat-bison-001" # Or handle appropriately
+    elif target_provider == "google_palm":
+        default_target_model = "models/chat-bison-001"
+    else:
+        default_target_model = "models/chat-bison-001"
 
     target_model = st.text_input("Target Model", default_target_model)
 
@@ -133,18 +117,17 @@ with col2:
     st.subheader("⚔️ Attack LLM")
     attack_provider = st.selectbox("Attack Provider", valid_providers, index=0)
     
-    if attack_provider == "openai":
+    if attack_provider == "open_ai":  # Changed to "open_ai"
         default_attack_model = "gpt-3.5-turbo"
         st.info("⚠️ Consider using Anthropic for more stable attacks.")
     elif attack_provider == "anthropic":
         default_attack_model = "claude-3-sonnet-20240229"
     elif attack_provider == "cohere":
         default_attack_model = "command"
-    # Update this section for google_palm
-    elif attack_provider == "google_palm": # Or your 'else' block if it covers google_palm
-        default_attack_model = "models/chat-bison-001" # Changed from "palm-2"
-    else: # Default or if other providers are added
-        default_attack_model = "models/chat-bison-001" # Or handle appropriately
+    elif attack_provider == "google_palm":
+        default_attack_model = "models/chat-bison-001"
+    else:
+        default_attack_model = "models/chat-bison-001"
         
     attack_model = st.text_input("Attack Model", default_attack_model)
 
@@ -174,37 +157,57 @@ if st.button("🚀 Start Vulnerability Analysis", type="primary"):
         st.error("Target provider and model required.")
     elif not attack_provider or not attack_model:
         st.error("Attack provider and model required.")
-    elif target_provider == "openai" and not openai_api_key_input:
+    # Ensure your existing API key validation checks for "open_ai" are correct
+    elif target_provider == "open_ai" and not openai_api_key_input:
         st.error("OpenAI selected but no API key provided.")
-    elif attack_provider == "openai" and not openai_api_key_input:
+    elif attack_provider == "open_ai" and not openai_api_key_input:
         st.error("OpenAI attack provider selected but no API key provided.")
     elif target_provider == "anthropic" and not anthropic_api_key_input:
         st.error("Anthropic selected but no API key provided.")
     elif attack_provider == "anthropic" and not anthropic_api_key_input:
         st.error("Anthropic attack provider selected but no API key provided.")
+    # Add similar checks for other providers if they require API keys (e.g., google_palm)
+    elif target_provider == "google_palm" and not google_api_key_input:
+        st.error("Google PaLM selected but no API key provided.")
+    elif attack_provider == "google_palm" and not google_api_key_input:
+        st.error("Google PaLM attack provider selected but no API key provided.")
     elif not run_all_attacks and not selected_attacks:
         st.error("Select at least one attack or enable 'Run all'.")
     else:
-        # Backend konfigürasyonunu düzelt
-        if not fix_backend_config(target_provider, attack_provider):
-            st.stop()
-        
         temp_prompt_file_path = ""
         try:
-            # Ortam değişkenlerini set et
-            os.environ["PYTHONIOENCODING"] = "utf-8"
-            os.environ["NO_COLOR"] = "1"
+            # Prepare custom environment for the subprocess
+            custom_env = os.environ.copy()
 
-            # API key'leri ayarla
             if openai_api_key_input:
-                os.environ["OPENAI_API_KEY"] = openai_api_key_input
-            if google_api_key_input:
-                os.environ["GOOGLE_API_KEY"] = google_api_key_input
+                custom_env["OPENAI_API_KEY"] = openai_api_key_input
+            if google_api_key_input: # Ensure this is set for google_palm
+                custom_env["GOOGLE_API_KEY"] = google_api_key_input
             if anthropic_api_key_input:
-                os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key_input
-            if local_openai_base_url:
-                os.environ["OPENAI_API_BASE"] = local_openai_base_url
+                custom_env["ANTHROPIC_API_KEY"] = anthropic_api_key_input
 
+            # Apply OpenAI specific config (logic from old fix_backend_config)
+            if target_provider == "open_ai" or attack_provider == "open_ai":
+                custom_env["OPENAI_API_TYPE"] = "openai"
+                # If OPENAI_API_VERSION was ever needed for Azure, ensure it's not set for standard OpenAI:
+                # custom_env.pop("OPENAI_API_VERSION", None)
+
+            if local_openai_base_url:
+                custom_env["OPENAI_API_BASE"] = local_openai_base_url
+            else:
+                # Ensure OPENAI_API_BASE is not set if local_openai_base_url is empty
+                custom_env.pop("OPENAI_API_BASE", None)
+
+            # Explicitly remove common proxy environment variables
+            proxy_vars_to_remove = [
+                "HTTP_PROXY", "HTTPS_PROXY", 
+                "http_proxy", "https_proxy", # Case-sensitive variations
+                "NO_PROXY", "FTP_PROXY", "ALL_PROXY", "ftp_proxy", "all_proxy",
+                "OPENAI_PROXY" 
+            ]
+            for var_name in proxy_vars_to_remove:
+                custom_env.pop(var_name, None)
+            
             # Temp dosya oluştur
             with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt", encoding='utf-8') as tmp_prompt_file:
                 tmp_prompt_file.write(final_system_prompt)
@@ -228,11 +231,10 @@ if st.button("🚀 Start Vulnerability Analysis", type="primary"):
 
             st.info(f"Executing: `{' '.join(command)}`")
             
-            # Alternatif çözüm önerisi
             st.info("💡 **Tip**: If OpenAI backend fails, try using Anthropic (Claude) which is more stable with PS-FUZZ.")
 
             # PS-FUZZ çalıştır
-            process = run_security_scan_with_fallback(command)
+            process = run_security_scan_with_fallback(command, custom_env) # Pass custom_env
             
             if process is None:
                 st.error("Failed to start security scan. Please check your configuration.")
