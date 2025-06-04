@@ -17,9 +17,21 @@ LLM Security Scanner is a Streamlit-based application that allows you to analyze
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-2. **Install dependencies:**
+2. **Install dependencies: (Install one by one Recommended)**
    ```bash
    pip install streamlit pandas prompt-security-fuzzer openai==0.28.1
+   ```
+3. **If you get pkg error**
+   ```bash
+   pip install --upgrade setuptools
+   ```
+4. **If you get proxy error**
+   ```bash
+   pip uninstall openai
+   ```
+   then
+   ```bash
+   pip install openai==0.28.1
    ```
 
 ## Usage
