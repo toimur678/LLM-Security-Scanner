@@ -19,7 +19,7 @@ LLM Security Scanner is a Streamlit-based application that allows you to analyze
    ```
 2. **Install dependencies:**
    ```bash
-   pip install streamlit pandas prompt-security-fuzzer
+   pip install streamlit pandas prompt-security-fuzzer openai==0.28.1
    ```
 
 ## Usage
